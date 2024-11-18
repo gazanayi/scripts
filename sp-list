@@ -1,0 +1,42 @@
+# Ensure Azure CLI is installed and you're logged in using 'az login'
+
+# Get all App Registrations
+$appRegistrations = az ad app list --query "[].{AppName:displayName, AppId:appId}" -o json | ConvertFrom-Json
+
+# Check if any App Registrations are returned
+if ($appRegistrations.Count -eq 0) {
+    Write-Host "No App Registrations found in your Azure Active Directory." -ForegroundColor Yellow
+    return
+}
+
+# Output header
+Write-Host "Application Name`tApplication ID`tSecret Expiration Date`tDays Remaining"
+
+# Loop through each App Registration
+foreach ($app in $appRegistrations) {
+    $appName = $app.AppName
+    $appId = $app.AppId
+
+    # Get the secrets for the current App Registration
+    $secrets = az ad app credential list --id $appId --query "[].{EndDate:endDateTime}" -o json | ConvertFrom-Json
+
+    if ($secrets.Count -eq 0) {
+        Write-Host "$appName`t$appId`tNo Secrets Found`tN/A" -ForegroundColor Yellow
+    } else {
+        foreach ($secret in $secrets) {
+            $endDate = [datetime]$secret.EndDate
+            $daysRemaining = ($endDate - (Get-Date)).Days
+
+            # Display results
+            if ($daysRemaining -le 30) {
+                $color = "Red"
+            } elseif ($daysRemaining -le 90) {
+                $color = "Yellow"
+            } else {
+                $color = "Green"
+            }
+
+            Write-Host "$appName`t$appId`t$endDate`t$daysRemaining" -ForegroundColor $color
+        }
+    }
+}
